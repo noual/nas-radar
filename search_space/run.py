@@ -105,7 +105,7 @@ if __name__ == "__main__":
     
     # Create sample data for NTK/Zen-NAS/NASWOT
     print("Preparing sample data for metrics...")
-    x_sample = torch.randn(10, 1, 128, 128).to("cuda:0")
+    x_sample = torch.randn(10, 1, 32, 32).to("cuda:0")
     
     # Main exploration loop
     for i in trange(NUM_TRIALS, desc="Architecture Search"):
