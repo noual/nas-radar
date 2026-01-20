@@ -146,7 +146,7 @@ if __name__ == "__main__":
             # Compute NTK metrics
             print(f"\n[{i+1}/{NUM_TRIALS}] Computing NTK...")
             ntk_model = deepcopy(model)
-            ntk_matrix = compute_ntk(ntk_model, x_sample, chunk_size=1, use_fp16=True)
+            ntk_matrix = compute_ntk(ntk_model, x_sample, chunk_size=1, use_fp16=False)
             lambda_0 = torch.linalg.eigvalsh(ntk_matrix).min().item()
             condition_number = torch.linalg.cond(ntk_matrix).item()
             
@@ -164,7 +164,7 @@ if __name__ == "__main__":
             print(f"[{i+1}/{NUM_TRIALS}] Training for {NUM_EPOCHS} epochs...")
             train_losses, val_losses = train_model(model, train_loader, val_loader, 
                                                    num_epochs=NUM_EPOCHS, device='cuda:0', 
-                                                   lr=1e-3, verbose=False)
+                                                   lr=5e-4, verbose=False)
             
             final_train_loss = train_losses[-1]
             final_val_loss = val_losses[-1]
