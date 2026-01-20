@@ -94,7 +94,7 @@ if __name__ == "__main__":
     
     # Configuration
     NUM_TRIALS = 10000  # Number of architectures to evaluate
-    NUM_EPOCHS = 10  # Training epochs per architecture
+    NUM_EPOCHS = 20  # Training epochs per architecture
     CSV_PATH = "exploration_with_training.csv"
     
     # Create dataset and data loaders (load once, reuse for all trials)
