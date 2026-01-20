@@ -14,6 +14,7 @@ from training_free_metrics.naswot.naswot import NASWOT
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from copy import deepcopy
 
 
 class DiceLoss(nn.Module):
@@ -144,7 +145,8 @@ if __name__ == "__main__":
             
             # Compute NTK metrics
             print(f"\n[{i+1}/{NUM_TRIALS}] Computing NTK...")
-            ntk_matrix = compute_ntk(model, x_sample, chunk_size=1, use_fp16=True)
+            ntk_model = deepcopy(model)
+            ntk_matrix = compute_ntk(ntk_model, x_sample, chunk_size=1, use_fp16=True)
             lambda_0 = torch.linalg.eigvalsh(ntk_matrix).min().item()
             condition_number = torch.linalg.cond(ntk_matrix).item()
             

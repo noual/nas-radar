@@ -15,6 +15,24 @@ def compute_ntk(model, x, chunk_size=1, use_fp16=False):
     Returns:
         NTK matrix of shape (N, N) in FP32
     """
+    # Initialize weights for NTK computation
+    def init_weights(m):
+        if isinstance(m, torch.nn.Linear):
+            torch.nn.init.normal_(m.weight, mean=0.0, std=1/m.in_features**0.5)
+            if m.bias is not None:
+                torch.nn.init.zeros_(m.bias)
+        elif isinstance(m, torch.nn.Conv2d):
+            fan_in = m.in_channels * m.kernel_size[0] * m.kernel_size[1]
+            torch.nn.init.normal_(m.weight, mean=0.0, std=1/fan_in**0.5)
+            if m.bias is not None:
+                torch.nn.init.zeros_(m.bias)
+        elif isinstance(m, torch.nn.BatchNorm2d) or isinstance(m, torch.nn.BatchNorm1d):
+            # Freeze batchnorm by setting to eval mode and disabling grad
+            m.eval()
+            m.weight.requires_grad = False
+            m.bias.requires_grad = False
+    
+    model.apply(init_weights)
     model.eval()  # Disable dropout
     
     n_samples = x.shape[0]

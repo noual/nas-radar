@@ -94,7 +94,7 @@ class Zero(nn.Module):
     def forward(self, x):
         batch, _, height, width = x.size()
         return torch.zeros(batch, self.out_channels, height, width, device=x.device, dtype=x.dtype)
-
+    
 
 def get_op_candidates(in_channels, out_channels):
     """Returns a dictionary of operation candidates for LayerChoice"""
