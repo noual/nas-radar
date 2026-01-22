@@ -29,7 +29,7 @@ def configure_seaborn(**kwargs):
             "grid.linewidth": 0.5,
             "grid.alpha": 0.4,
             'font.family':'sans-serif',
-            'font.sans-serif':['Lato'],
+            # 'font.sans-serif':['Lato'],
         },)
 
     palette = ["#3D405B", "#E08042", "#54AB69", "#CE2F49", "#A26EBF", "#75523A", "#D12AA2", "#E0D06F", "#6F9AA7", "#3359C4",
