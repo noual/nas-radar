@@ -1,0 +1,28 @@
+seed: 308
+device: cuda:0
+log_dir: runs/pareto_nrpa
+problem:
+  name: radar
+  n_objectives: 2
+  dataset_path: data/train_bth/mat
+  batch_size: 8
+  supernet:
+    channel_options:
+    - 8
+    - 16
+    - 32
+    - 64
+    in_channels: 1
+    initial_channels: 8
+    num_encoder_stages: 3
+    num_nodes: 5
+    n_steps: 5
+search:
+  algorithm: pareto_nrpa
+  level: 3
+  n_iter: 30
+  alpha: 0.5
+  softmax_temperature: 1.0
+  limited_repetitions: 4
+  n_policies: 4
+  progressbar: true

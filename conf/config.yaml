@@ -1,0 +1,8 @@
+defaults:
+  - _self_
+  - problem: radar
+  - search: pareto_nrpa
+
+seed: 308
+device: cuda:0
+log_dir: runs/pareto_nrpa

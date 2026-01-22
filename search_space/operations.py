@@ -95,12 +95,26 @@ class Zero(nn.Module):
         batch, _, height, width = x.size()
         return torch.zeros(batch, self.out_channels, height, width, device=x.device, dtype=x.dtype)
     
+class DepthwiseConv3x3(nn.Module):
+    """3x3 Depthwise Convolution"""
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.depthwise = nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1, groups=in_channels, bias=False)
+        self.pointwise = nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False)
+        self.bn = nn.BatchNorm2d(out_channels)
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        x = self.depthwise(x)
+        x = self.pointwise(x)
+        return self.relu(self.bn(x))
+    
 
 def get_op_candidates(in_channels, out_channels):
-    """Returns a dictionary of operation candidates for LayerChoice"""
     return {
         'conv_1x1': Conv1x1(in_channels, out_channels),
         'conv_1x3_3x1': Conv1x3_3x1(in_channels, out_channels),
+        'depthwise_conv_3x3': DepthwiseConv3x3(in_channels, out_channels),
         'conv_1x5_5x1': Conv1x5_5x1(in_channels, out_channels),
         'dilated_conv_3x3_r2': DilatedConv3x3_r2(in_channels, out_channels),
         'dilated_conv_3x3_r4': DilatedConv3x3_r4(in_channels, out_channels),

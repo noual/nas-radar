@@ -1,7 +1,5 @@
 import torch
 import torch.nn as nn
-import nni
-from nni.nas.nn.pytorch import ModelSpace, LayerChoice, MutableModule
 from collections import OrderedDict
 from search_space.cell import RadarCell, prune_cell
 
@@ -21,10 +19,27 @@ class ChannelAdapter(nn.Module):
         return x
 
 
-class RadarNetwork(ModelSpace):
+def create_stem(in_channels, initial_channels):
+    """
+    Create a stem module for the network.
+    
+    Args:
+        in_channels: Number of input channels.
+        initial_channels: Number of output channels after stem.
+        
+    Returns:
+        nn.Sequential module for the stem.
+    """
+    return nn.Sequential(
+        nn.Conv2d(in_channels, initial_channels, kernel_size=3, padding=1, bias=False),
+        nn.BatchNorm2d(initial_channels),
+        nn.ReLU(inplace=True)
+    )
+
+
+class RadarNetwork(nn.Module):
     """
     U-Net style network with flexible number of encoding and decoding stages.
-    Uses nni.choice() for channel selection at each stage.
     
     Encoder and decoder cells are created dynamically based on chosen channel values.
     """
@@ -284,3 +299,179 @@ class RadarNetwork(ModelSpace):
         for i in range(self.num_decoder_stages):
             if self.decoder_cells[i] is not None and self.decoder_cells[i].is_terminal:
                 self.decoder_cells[i] = prune_cell(self.decoder_cells[i])
+    
+    def get_channel_config(self):
+        """
+        Return the channel configuration for all stages.
+        
+        Returns:
+            Dictionary with encoder_channels, bottleneck_channels, and decoder_channels.
+        """
+        return {
+            'encoder_channels': list(self._encoder_channels),
+            'bottleneck_channels': self._bottleneck_channels,
+            'decoder_channels': list(self._decoder_channels)
+        }
+    
+    def get_cell_operations(self):
+        """
+        Return the operations selected for each edge in the cells.
+        
+        Returns:
+            Dictionary mapping edge names to operation names.
+            Returns None if cells are not yet created or not terminal.
+        """
+        if self.encoder_cells[0] is None:
+            return None
+        
+        cell = self.encoder_cells[0]  # All cells share the same structure
+        ops = {}
+        
+        for node_idx, edge_idx, edge_name, edge_module in cell.iterate_edges():
+            if isinstance(edge_module, nn.ModuleDict):
+                # Not yet fixed
+                return None
+            else:
+                # Get operation class name
+                ops[edge_name] = edge_module.__class__.__name__
+        
+        return ops
+
+
+class MaximalRadarNetwork(nn.Module):
+    """
+    A fully instantiated RadarNetwork with maximum channel configuration.
+    
+    This class serves as the "Weight Bank" for the SuperNet, storing weights
+    for all possible operations at maximum channel counts. Unlike RadarNetwork,
+    all cells and operations are instantiated immediately during initialisation.
+    
+    The cell edges contain ModuleDict objects holding all operation variants,
+    enabling direct access to operation weights.
+    
+    Attributes:
+        in_channels: Number of input channels.
+        initial_channels: Number of channels after the stem.
+        max_channels: Maximum channel count (used for all stages).
+        num_nodes: Number of nodes per cell.
+        num_encoder_stages: Number of encoder (and decoder) stages.
+    """
+    
+    def __init__(self, in_channels, initial_channels, max_channels, 
+                 num_encoder_stages=3, num_nodes=4, device='cpu'):
+        """
+        Initialise the maximal network with all weights.
+        
+        Args:
+            in_channels: Number of input channels (e.g., 1 for grayscale).
+            initial_channels: Number of channels after stem convolution.
+            max_channels: Maximum channel count for all stages.
+            num_encoder_stages: Number of encoding stages.
+            num_nodes: Number of nodes in each RadarCell DAG.
+        """
+        super().__init__()
+        self.in_channels = in_channels
+        self.initial_channels = initial_channels
+        self.max_channels = max_channels
+        self.num_nodes = num_nodes
+        self.num_encoder_stages = num_encoder_stages
+        self.num_decoder_stages = num_encoder_stages
+        self.device = device
+        
+        # Stem: initial_channels -> max_channels
+        self.stem = create_stem(in_channels, initial_channels)
+        
+        # Adapter from initial_channels to max_channels (for first encoder)
+        self.stem_adapter = ChannelAdapter(initial_channels, max_channels)
+        
+        # Downsampling and upsampling layers
+        self.downsample_layers = nn.ModuleList([
+            nn.MaxPool2d(2) for _ in range(num_encoder_stages)
+        ])
+        self.upsample_layers = nn.ModuleList([
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+            for _ in range(num_encoder_stages)
+        ])
+        
+        # Create encoder cells (all with max_channels -> max_channels)
+        self.encoder_cells = nn.ModuleList()
+        for i in range(num_encoder_stages):
+            cell = RadarCell(max_channels, max_channels, num_nodes, store_all_ops=True)
+            self.encoder_cells.append(cell)
+        
+        # Create bottleneck cell (max_channels -> max_channels)
+        self.bottleneck = RadarCell(max_channels, max_channels, num_nodes, store_all_ops=True)
+        
+        # Create decoder cells
+        # Decoder input: upsampled (max_channels) + skip (max_channels) = 2*max_channels
+        self.decoder_cells = nn.ModuleList()
+        for i in range(num_encoder_stages):
+            # Decoder receives concatenated channels: upsampled + skip
+            decoder_in = 2 * max_channels
+            cell = RadarCell(decoder_in, max_channels, num_nodes, store_all_ops=True)
+            self.decoder_cells.append(cell)
+        
+        # Final convolution
+        self.final_conv = nn.Conv2d(max_channels, in_channels, kernel_size=1)
+        self.to(device)
+    
+    def forward(self, x, selected_ops=None):
+        """
+        Forward pass through the maximal network.
+        
+        Args:
+            x: Input tensor of shape (B, in_channels, H, W).
+            selected_ops: Optional dict mapping edge names to operation names.
+                         If provided, only selected operations are executed.
+                         
+        Returns:
+            Output tensor of shape (B, in_channels, H, W).
+        """
+        # Stem
+        x = self.stem(x)
+        x = self.stem_adapter(x)
+        
+        # Encoding path
+        encoder_outputs = []
+        for i in range(self.num_encoder_stages):
+            x = self.encoder_cells[i](x, selected_ops)
+            encoder_outputs.append(x)
+            x = self.downsample_layers[i](x)
+        
+        # Bottleneck
+        x = self.bottleneck(x, selected_ops)
+        
+        # Decoding path (reverse order)
+        for i in range(self.num_decoder_stages - 1, -1, -1):
+            x = self.upsample_layers[i](x)
+            x = torch.cat([x, encoder_outputs[i]], dim=1)
+            x = self.decoder_cells[i](x, selected_ops)
+        
+        # Final output
+        x = self.final_conv(x)
+        return x
+    
+    def get_operation(self, cell_type, stage_idx, node_idx, edge_idx, op_name):
+        """
+        Retrieve a specific operation module from the network.
+        
+        Args:
+            cell_type: One of 'encoder', 'bottleneck', or 'decoder'.
+            stage_idx: Index of the stage (ignored for bottleneck).
+            node_idx: Node index within the cell.
+            edge_idx: Edge index (source node index).
+            op_name: Name of the operation to retrieve.
+            
+        Returns:
+            The operation module.
+        """
+        if cell_type == 'encoder':
+            cell = self.encoder_cells[stage_idx]
+        elif cell_type == 'bottleneck':
+            cell = self.bottleneck
+        elif cell_type == 'decoder':
+            cell = self.decoder_cells[stage_idx]
+        else:
+            raise ValueError(f"Unknown cell_type: {cell_type}")
+        
+        return cell.get_edge_operation(node_idx, edge_idx, op_name)
