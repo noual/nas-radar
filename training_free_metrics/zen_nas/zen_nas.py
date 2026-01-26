@@ -82,7 +82,7 @@ if __name__ == "__main__":
     # Example usage
     import sys
     sys.path.append("../..")
-    from search_space.radar_node import RadarNode
+    from search_spaces.radar_node import RadarNode
     import random
 
 

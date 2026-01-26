@@ -46,7 +46,7 @@ if __name__ == "__main__":
     # Example usage
     import sys
     sys.path.append("../..")
-    from search_space.radar_node import RadarNode
+    from search_spaces.radar_node import RadarNode
 
     node = RadarNode(in_channels=3, initial_channels=8, channel_options=[8, 16, 32, 64], num_encoder_stages=3, num_nodes=4)
     while not node.is_terminal:

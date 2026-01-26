@@ -11,7 +11,7 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from search_algorithms.pareto_nrpa.pareto_nrpa import ParetoNRPA
-from search_space.radar import Radar
+from search_spaces.radar import Radar
 
 
 import matplotlib.pyplot as plt

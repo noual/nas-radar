@@ -10,7 +10,7 @@ from pymoo.util.nds.non_dominated_sorting import NonDominatedSorting
 
 from helpers.radar_logger import RadarLogger
 from search_algorithms.pareto_nrpa.policy_manager import PolicyManager
-from search_space.radar_node import RadarNode
+from search_spaces.radar_node import RadarNode
 from tqdm import tqdm
 
 
@@ -35,10 +35,10 @@ class ParetoNRPA:
             self.progress_bar = tqdm(total=total_steps, desc="Progress", unit="step")
 
 
-        self._adapt_search_space()
+        self._adapt_search_spaces()
         self._initialize()
 
-    def _adapt_search_space(self):
+    def _adapt_search_spaces(self):
         if self.config.problem.name == "radar":
             self.node_type = RadarNode
             self.logger = RadarLogger(self.config)

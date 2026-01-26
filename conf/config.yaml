@@ -5,4 +5,4 @@ defaults:
 
 seed: 308
 device: cuda:0
-log_dir: runs/pareto_nrpa
+log_dir: results/pareto_nrpa
