@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.optim.lr_scheduler import CosineAnnealingLR
 import sys
 import argparse
 from datetime import datetime
@@ -19,6 +20,8 @@ if str(project_root) not in sys.path:
 
 from data.radar_dataset import RadarDavaDataset
 from utils.models.unet import UNet
+from search_spaces.dag_search_space.radar_node import RadarNode
+from search_spaces.dag_search_space.supernet import SuperNet
 
 class DiceLoss(nn.Module):
     def __init__(self):
@@ -65,7 +68,7 @@ def evaluate(model, dataloader, criterion, device):
     return total_loss / n, total_dice / n, total_iou / n
 
 
-def train_unet(data_path, cell_str, epochs=200, batch_size=8, learning_rate=1e-5, name="model", in_features=16, problem_config=None):
+def train_unet(data_path, cell_str, epochs=200, batch_size=8, learning_rate=1e-5, name="model", in_features=16, problem_config=None, eta_min_factor=0.01):
     features = [in_features, in_features*2, in_features*4, in_features*8]
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print(f"DEVICE: {device}")
@@ -88,13 +91,19 @@ def train_unet(data_path, cell_str, epochs=200, batch_size=8, learning_rate=1e-5
 
     criterion = DiceLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    
+    # Cosine learning rate scheduler
+    scheduler = CosineAnnealingLR(optimizer, T_max=epochs, eta_min=learning_rate * eta_min_factor)
+    
     print(f"Model initialized with {sum(p.numel() for p in model.parameters() if p.requires_grad)} trainable parameters.")
+    print(f"Using cosine learning rate decay from {learning_rate} to {learning_rate * eta_min_factor} over {epochs} epochs")
 
     # W&B init
     wandb.init(project="nas-radar", name=name,
                config={"epochs": epochs, "batch_size": batch_size,
                        "learning_rate": learning_rate, "in_features": in_features,
-                       "cell_str": cell_str},
+                       "cell_str": cell_str, "eta_min_factor": eta_min_factor,
+                       "scheduler": "CosineAnnealingLR"},
                mode="online")
     wandb.watch(model, log="all", log_freq=100)
 
@@ -146,12 +155,15 @@ def train_unet(data_path, cell_str, epochs=200, batch_size=8, learning_rate=1e-5
 
         print(f"Epoch {epoch+1}: Train Loss {train_loss:.4f}, Val Loss {val_loss:.4f}, "
               f"Train Dice {train_dice:.4f}, Val Dice {val_dice:.4f}, "
-              f"Train IoU {train_iou:.4f}, Val IoU {val_iou:.4f}")
+              f"Train IoU {train_iou:.4f}, Val IoU {val_iou:.4f}, LR {optimizer.param_groups[0]['lr']:.6f}")
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             torch.save(model.state_dict(), f'results/best_{name}_model.pth')
             wandb.save(f'results/best_{name}_model.pth')
+        
+        # Step the learning rate scheduler
+        scheduler.step()
 
     return model
 
@@ -162,6 +174,7 @@ def main():
     parser.add_argument('--epochs', type=int, default=100, help='Number of epochs')
     parser.add_argument('--batch_size', type=int, default=16, help='Batch size')
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
+    parser.add_argument('--eta_min_factor', type=float, default=0.01, help='Minimum learning rate factor for cosine decay (eta_min = lr * eta_min_factor)')
     parser.add_argument('--name', type=str, default=datetime.now().strftime("%d_%H_%M"), help='Run name')
     parser.add_argument('--data_path', type=str, default="data/training_set/mat", help='Path to data')
 
@@ -182,7 +195,7 @@ def main():
     model = train_unet(args.data_path, args.cell_str, epochs=args.epochs,
                        learning_rate=args.lr, batch_size=args.batch_size,
                        name=args.name, in_features=args.in_features, 
-                       problem_config=problem_config)
+                       problem_config=problem_config, eta_min_factor=args.eta_min_factor)
     torch.save(model.state_dict(), f'./results/{args.name}_net.pth')
     print(f"Model saved as ./results/{args.name}_net.pth")
 
