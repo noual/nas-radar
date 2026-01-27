@@ -169,28 +169,26 @@ if __name__ == "__main__":
                 
                 # Timing
                 start_time = time.time()
-                for _ in range(10):
+                for _ in range(100):
                     _ = model(x_sample)
                 torch.cuda.synchronize()
                 end_time = time.time()
                 
-                inference_time_gpu = (end_time - start_time) / 10
+                inference_time_gpu = (end_time - start_time) / 100
 
             # Compute inference time on CPU
             model.to("cpu")
             with torch.no_grad():
                 # Warmup
                 _ = model(x_cpu)
-                torch.cuda.synchronize()
                 
                 # Timing
                 start_time = time.time()
-                for _ in range(10):
+                for _ in range(100):
                     _ = model(x_cpu)
-                torch.cuda.synchronize()
                 end_time = time.time()
                 
-                inference_time_cpu = (end_time - start_time) / 10
+                inference_time_cpu = (end_time - start_time) / 100
 
             model.to("cuda:0")
             
@@ -217,8 +215,8 @@ if __name__ == "__main__":
                                                    num_epochs=NUM_EPOCHS, device='cuda:0', 
                                                    lr=5e-4, verbose=False)
             
-            final_train_loss = train_losses[-1]
-            final_val_loss = val_losses[-1]
+            final_train_loss = min(train_losses)
+            final_val_loss = min(val_losses)
             
             # Prepare row for CSV
             row = {

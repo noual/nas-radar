@@ -87,7 +87,7 @@ class FrugalRadarNode:
             'double_conv_3x3_d2': 'dbl3x3d2',    # New: Standard U-Net block
             'double_conv_3x3_d4': 'dbl3x3d4',    # New: Standard U-Net block
             'res_double_conv_3x3': 'res2c3', # New: Residual double conv
-            'mbconv_3x3_no_se': 'mb3_ns',   # New: MBConv without Squeeze-and-Excitation
+            'mbconv_3x3_no_se': 'mb3ns',   # New: MBConv without Squeeze-and-Excitation
             'none': 'z'                     # Kept for compatibility if zero-ops are used
         }
         parts = []
@@ -97,6 +97,53 @@ class FrugalRadarNode:
         for i in range(self.num_decoder_stages):
             parts.append(f"d{i}_ch{self._decoder_channels[i]}_{op_map.get(self._decoder_ops[i], self._decoder_ops[i])}")
         return ":".join(parts)
+    
+    def from_str(self, architecture_str: str):
+        op_map_inv = {
+            'id': 'identity',
+            'c1x1': 'conv_1x1',
+            'c3x3': 'conv_3x3',
+            'sep3x3': 'sep_conv_3x3',
+            'dbl3x3': 'double_conv_3x3',
+            'dbl3x3d2': 'double_conv_3x3_d2',
+            'dbl3x3d4': 'double_conv_3x3_d4',
+            'res2c3': 'res_double_conv_3x3',
+            'mb3ns': 'mbconv_3x3_no_se',
+            'z': 'none'
+        }
+        parts = architecture_str.split(":")
+        for part in parts:
+            if part.startswith('e'):
+                stage, rest = part[1:].split('_ch')
+                index = int(stage)
+                if rest.endswith("mb3_ns"):  # Temporary fix
+                    rest = rest[:-6]+"mb3ns"
+                ch_str, op_str = rest.split('_')
+                ch = int(ch_str)
+                op = op_map_inv.get(op_str, op_str)
+                self.play_action(f'encoder_{index}_channels', ch)
+                self.play_action(f'encoder_{index}_op', op)
+            elif part.startswith('b'):
+                _, rest = part.split('_ch')
+                if rest.endswith("mb3_ns"):  # Temporary fix
+                    rest = rest[:-6]+"mb3ns"
+                ch_str, op_str = rest.split('_')
+                ch = int(ch_str)
+                op = op_map_inv.get(op_str, op_str)
+                self.play_action('bottleneck_channels', ch)
+                self.play_action('bottleneck_op', op)
+            elif part.startswith('d'):
+                stage, rest = part[1:].split('_ch')
+                index = int(stage)
+                if rest.endswith("mb3_ns"):  # Temporary fix
+                    rest = rest[:-6]+"mb3ns"
+                ch_str, op_str = rest.split('_')
+                ch = int(ch_str)
+                op = op_map_inv.get(op_str, op_str)
+                self.play_action(f'decoder_{index}_channels', ch)
+                self.play_action(f'decoder_{index}_op', op)
+            else:
+                raise ValueError(f"Invalid architecture string part: {part}")
         
     def play_action(self, name: str, value):
         if name.startswith('encoder_') and name.endswith('_channels'):
