@@ -88,7 +88,7 @@ if __name__ == "__main__":
     config = OmegaConf.create({
     "problem": {
         "n_objectives": 2,
-        "dataset_path": "./data/train_bth/mat",
+        "dataset_path": "../data/train_bth/mat",
         "batch_size": 8,
         "supernet": {
             "in_channels": 3,

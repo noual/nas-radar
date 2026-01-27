@@ -132,13 +132,10 @@ class MaximalFrugalRadarNetwork(nn.Module):
         for (i, module_dict), channels in zip(enumerate(self.decoder), channel_config['decoder']):
             op_name = selected_ops['decoder'][i]
             x = self.up(x)
-            print(f"Original x shape: {x.shape}, skip connection shape: {skip_connections[i].shape}")
             skip_conn = skip_connections[i]
             if x.shape != skip_conn.shape:
                 x = F.interpolate(x, size=skip_conn.shape[2:])
             x = torch.cat((skip_conn, x), dim=1)
-            print(f"After concat x shape: {x.shape}")
-            print(f"In channels for operation: {x.size(1)}, out channels: {channels}")
             x = apply_sliced_operation(module_dict[op_name], x, in_channels=x.size(1), out_channels=channels)
 
         sliced_weight = self.final_conv.weight[:self.out_channels, :x.size(1), :, :]
@@ -203,6 +200,7 @@ class FrugalRadarNetwork(nn.Module):
                 
                 op_name = action[1]
                 in_ch = self.channel_list["bottleneck"] if stage_idx == 0 else self.channel_list["decoder"][stage_idx - 1]
+                in_ch += self.channel_list["encoder"][-(stage_idx + 1)]  # due to skip connection
                 out_ch = self.channel_list["decoder"][stage_idx]
                 operation = OPERATIONS[op_name](in_ch, out_ch)
                 self.decoder.append(operation)
@@ -232,17 +230,24 @@ class FrugalRadarNetwork(nn.Module):
     def forward(self, x):
         assert self.is_terminal, "Network is not fully defined."
         x = self.stem(x)
+        skip_connections = []
         # Encoder
         for i, module in enumerate(self.encoder):
             x = module(x)
+            skip_connections.append(x)
             x = self.pool(x)
 
         # Bottleneck
         x = self.bottleneck(x)
+        skip_connections = skip_connections[::-1]
 
         # Decoder
         for i, module in enumerate(self.decoder):
             x = self.up(x)
+            skip_conn = skip_connections[i]
+            if x.shape != skip_conn.shape:
+                x = F.interpolate(x, size=skip_conn.shape[2:])
+            x = torch.cat((skip_conn, x), dim=1)
             x = module(x)
 
 

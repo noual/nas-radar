@@ -1,3 +1,4 @@
+import math
 import torch
 import time
 import torch.nn as nn
@@ -17,13 +18,13 @@ OPERATIONS = {
         nn.ReLU(inplace=True)
     ),
     'depthwise_conv_3x3': lambda in_ch, out_ch: nn.Sequential(
-        nn.Conv2d(in_ch, out_ch, kernel_size=3, padding=1, bias=False, groups=min(in_ch, out_ch)),
+        nn.Conv2d(in_ch, out_ch, kernel_size=3, padding=1, bias=False, groups=math.gcd(in_ch, out_ch)),
         nn.Conv2d(out_ch, out_ch, kernel_size=1, padding=0, bias=False),
         nn.BatchNorm2d(out_ch),
         nn.ReLU(inplace=True)
     ),
     'depthwise_conv_5x5': lambda in_ch, out_ch: nn.Sequential(
-        nn.Conv2d(in_ch, out_ch, kernel_size=5, padding=2, bias=False, groups=min(in_ch, out_ch)),
+        nn.Conv2d(in_ch, out_ch, kernel_size=5, padding=2, bias=False, groups=math.gcd(in_ch, out_ch)),
         nn.Conv2d(out_ch, out_ch, kernel_size=1, padding=0, bias=False),
         nn.BatchNorm2d(out_ch),
         nn.ReLU(inplace=True)
