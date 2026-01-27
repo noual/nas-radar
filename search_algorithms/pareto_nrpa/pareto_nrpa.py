@@ -8,10 +8,11 @@ from pymoo.core.individual import Individual
 from pymoo.core.population import Population
 from pymoo.util.nds.non_dominated_sorting import NonDominatedSorting
 
-from helpers.radar_logger import RadarLogger
 from search_algorithms.pareto_nrpa.policy_manager import PolicyManager
-from search_spaces.radar_node import RadarNode
+from search_spaces.efficient_search_space.radar_node import FrugalRadarNode
 from tqdm import tqdm
+
+from utils.radar_logger import RadarLogger
 
 
 class ParetoNRPA:
@@ -40,7 +41,7 @@ class ParetoNRPA:
 
     def _adapt_search_spaces(self):
         if self.config.problem.name == "radar":
-            self.node_type = RadarNode
+            self.node_type = FrugalRadarNode
             self.logger = RadarLogger(self.config)
 
         ## Custom problems can be added here
@@ -83,7 +84,7 @@ class ParetoNRPA:
             try:
                 csv_path = f"{self.config.log_dir}/df_history.csv"
                 row = {
-                    "X": new_individual.get("X"),
+                    "X": node.to_str(),
                     "F": list([float(e) for e in new_individual.get("F")]),
                     "P": int(new_individual.get("P")),
                 }

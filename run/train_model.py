@@ -20,8 +20,10 @@ if str(project_root) not in sys.path:
 
 from data.radar_dataset import RadarDavaDataset
 from utils.models.unet import UNet
-from search_spaces.dag_search_space.radar_node import RadarNode
-from search_spaces.dag_search_space.supernet import SuperNet
+
+from search_spaces.efficient_search_space.radar_node import FrugalRadarNode
+from search_spaces.efficient_search_space.supernet import FrugalSuperNet
+
 
 class DiceLoss(nn.Module):
     def __init__(self):
@@ -81,13 +83,13 @@ def train_unet(data_path, cell_str, epochs=200, batch_size=8, learning_rate=1e-5
     if cell_str == "unet":
         model = UNet(in_channels=1, initial_channels=8, features=[16, 32, 64, 128]).to(device)
     else:
-        node = RadarNode(problem_config)
+        node = FrugalRadarNode(problem_config)
         node.from_str(cell_str)
-        supernet = SuperNet(in_channels=node.in_channels, initial_channels=node.initial_channels,
+        supernet = FrugalSuperNet(in_channels=node.in_channels, initial_channels=node.initial_channels,
                             channel_options=node.channel_options, num_encoder_stages=node.num_encoder_stages,
-                            num_nodes=node.num_nodes)
+                            device=device)
         model = supernet.sample(node).to(device)
-        model.prune_cells()
+        _ = model(torch.randn(1, 1, 128, 128).to(device))  # Warmup
 
     criterion = DiceLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -180,17 +182,16 @@ def main():
 
     args = parser.parse_args()
     
-    # Load config for problem settings
-    from types import SimpleNamespace
-    problem_config = SimpleNamespace(
-        supernet=SimpleNamespace(
-            in_channels=1,
-            initial_channels=8,
-            channel_options=[8, 16, 32, 64],
-            num_encoder_stages=3,
-            num_nodes=5
-        )
-    )
+    # Load config using Hydra
+    from hydra import compose, initialize
+    from hydra.core.global_hydra import GlobalHydra
+    
+    # Initialize Hydra if not already initialized
+    if not GlobalHydra.instance().is_initialized():
+        initialize(config_path="../conf", version_base=None)
+    
+    cfg = compose(config_name="config")
+    problem_config = cfg.problem
     
     model = train_unet(args.data_path, args.cell_str, epochs=args.epochs,
                        learning_rate=args.lr, batch_size=args.batch_size,

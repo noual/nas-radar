@@ -10,9 +10,7 @@ import numpy as np
 from PIL import Image
 from pymoo.indicators.hv import HV
 from torch.utils.tensorboard import SummaryWriter
-
-from helpers.utils import configure_seaborn
-
+from utils.helpers import configure_seaborn
 
 class RadarLogger:
     """
@@ -141,10 +139,6 @@ class RadarLogger:
         # Pareto Front
         if optimal_set is not None and len(optimal_set) > 0:
             self._log_pareto_front(step, optimal_set, global_optimal_set)
-        
-        # Policy Probabilities
-        if policy_manager is not None:
-            self._log_policy_heatmap(step, policy_manager)
 
     def _log_pareto_front(self, step, optimal_set, global_optimal_set):
         """
@@ -202,96 +196,6 @@ class RadarLogger:
             
         except Exception as e:
             print(f"Pareto front plotting error: {e}")
-
-    def _log_policy_heatmap(self, step, policy_manager):
-        """
-        Visualize policy probabilities as a heatmap.
-        Shows action preferences for each policy.
-        """
-        try:
-            n_policies = len(policy_manager.policies)
-            if n_policies == 0:
-                return
-            
-            # Collect all unique action codes across all policies
-            all_codes = set()
-            for policy in policy_manager.policies.values():
-                all_codes.update(policy.keys())
-            
-            if len(all_codes) == 0:
-                return
-            
-            # Sort codes for consistent ordering
-            all_codes = sorted(all_codes, key=lambda x: str(x))
-            n_actions = len(all_codes)
-            
-            # Limit to most important actions if too many
-            max_actions = 50
-            if n_actions > max_actions:
-                # Select actions with highest variance across policies
-                action_values = np.zeros((n_policies, n_actions))
-                for i, policy in enumerate(policy_manager.policies.values()):
-                    for j, code in enumerate(all_codes):
-                        action_values[i, j] = policy.get(code, 0)
-                variances = action_values.var(axis=0)
-                top_indices = np.argsort(variances)[-max_actions:]
-                all_codes = [all_codes[i] for i in sorted(top_indices)]
-                n_actions = len(all_codes)
-            
-            # Build probability matrix
-            prob_matrix = np.zeros((n_policies, n_actions))
-            
-            for i, (pol_idx, policy) in enumerate(policy_manager.policies.items()):
-                for j, code in enumerate(all_codes):
-                    prob_matrix[i, j] = policy.get(code, 0)
-            
-            # Apply softmax per policy for visualization
-            exp_matrix = np.exp(prob_matrix - prob_matrix.max(axis=1, keepdims=True))
-            prob_matrix_norm = exp_matrix / exp_matrix.sum(axis=1, keepdims=True)
-            
-            # Create heatmap
-            fig, ax = plt.subplots(figsize=(max(12, n_actions * 0.3), 4 + n_policies * 0.5))
-            
-            im = ax.imshow(prob_matrix_norm, aspect='auto', cmap='YlOrRd', vmin=0)
-            
-            # Labels
-            ax.set_yticks(range(n_policies))
-            ax.set_yticklabels([f"Policy {i}" for i in policy_manager.policies.keys()])
-            
-            # X-axis: show abbreviated action names
-            if n_actions <= 30:
-                ax.set_xticks(range(n_actions))
-                labels = [self._format_action_code(c) for c in all_codes]
-                ax.set_xticklabels(labels, rotation=45, ha='right', fontsize=8)
-            else:
-                ax.set_xlabel("Actions (sorted by policy variance)")
-            
-            ax.set_title(f"Policy Action Probabilities (Step {step})", fontsize=14)
-            
-            cbar = fig.colorbar(im, ax=ax)
-            cbar.set_label("Probability", fontsize=10)
-            
-            plt.tight_layout()
-            self._save_figure_to_tensorboard(fig, "visuals/policy_heatmap", step)
-            
-        except Exception as e:
-            print(f"Policy heatmap error: {e}")
-
-    def _format_action_code(self, code):
-        """Format action code for display."""
-        if isinstance(code, tuple):
-            # Extract meaningful parts
-            parts = []
-            for item in code:
-                if isinstance(item, tuple) and len(item) == 2:
-                    name, val = item
-                    # Abbreviate
-                    name = name.replace('encoder_', 'E').replace('decoder_', 'D')
-                    name = name.replace('_channels', '').replace('bottleneck', 'B')
-                    name = name.replace('edge_', 'e')
-                    parts.append(f"{name}:{val}")
-            return '|'.join(parts[-2:]) if len(parts) > 2 else '|'.join(parts)
-        return str(code)[:15]
 
     # =========================================================================
     #  UTILITIES

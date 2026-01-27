@@ -3,9 +3,9 @@ n_objectives: 2
 dataset_path: data/train_bth/mat
 batch_size: 8
 supernet:
-  channel_options: [8, 16, 32, 64]
+  channel_options: [8, 16, 32, 64, 128, 256]
   in_channels: 1
   initial_channels: 8
-  num_encoder_stages: 3
+  num_encoder_stages: 4
   num_nodes: 5
   n_steps: 1

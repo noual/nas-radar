@@ -46,8 +46,9 @@ class Radar:
             batch = next(iter(self.train_loader))
             inputs, targets = batch
             inputs, targets = inputs.to(self.device), targets.to(self.device)
-            selected_ops = self.supernet.get_selected_ops_from_node(node)
-            outputs = self.supernet.maximal_net(inputs, selected_ops=selected_ops)
+            selected_ops = node.get_selected_ops()
+            channel_config = node.get_channel_config()
+            outputs = self.supernet.maximal_net(inputs, selected_ops=selected_ops, channel_config=channel_config)
             loss = self.criterion(outputs, targets)
             total_loss += loss.item()
             loss.backward()
@@ -57,21 +58,21 @@ class Radar:
         avg_loss = total_loss / self.n_steps
 
         # Latency: sample the supernet, prune it and measure latency
+        x_cpu = torch.randn(1, self.supernet.in_channels, 128, 128).to("cpu")
+        x_gpu = x_cpu.to(self.device)
         with torch.no_grad():
-            sample = self.supernet.sample(node).to(self.device)
+            sample = self.supernet.sample(node)
             sample.eval()
-            sample.prune_cells()
             # Warmup
-            _ = sample(inputs)
-            torch.cuda.synchronize()
+            _ = sample(x_gpu)
+            sample.to("cpu")
+            inputs = x_cpu.to("cpu")
             t0 = time.time()
             for i in range(10):
                 _ = sample(inputs)
             t1 = time.time()
-            torch.cuda.synchronize()
             latency = (t1 - t0) / 10.0
         del sample, inputs, targets
-        torch.cuda.empty_cache()
         return [avg_loss, latency]
     
 if __name__ == "__main__":

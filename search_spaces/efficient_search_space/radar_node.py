@@ -1,8 +1,14 @@
+import random
 from typing import List, Optional
 
+import numpy as np
 from pyparsing import Dict
 
-from efficient_search_space.operations import OPERATIONS
+import sys
+sys.path.append(".")
+sys.path.append("..")
+
+from search_spaces.efficient_search_space.operations import OPERATIONS
 
 class FrugalRadarNode:
     
@@ -145,7 +151,8 @@ class FrugalRadarNode:
             else:
                 raise ValueError(f"Invalid architecture string part: {part}")
         
-    def play_action(self, name: str, value):
+    def play_action(self, action):
+        name, value = action
         if name.startswith('encoder_') and name.endswith('_channels'):
             index = int(name.split('_')[1])
             self._encoder_channels[index] = value
@@ -166,6 +173,38 @@ class FrugalRadarNode:
             raise ValueError(f"Unknown action name: {name}")
         
         self.path.append((name, value))
+
+    def playout(self, policy: Dict,
+                move_coder: callable, 
+                softmax_temp: float = 1.0):
+        while not self.is_terminal:
+            available_actions = self.get_actions_tuples()
+            policy_values = [policy.get(move_coder(self.state, act), 0) for act in available_actions]
+            exp_values = np.exp(np.array(policy_values) / softmax_temp)
+            probs = exp_values / np.sum(exp_values)
+            action_index = random.choices(np.arange(len(available_actions)), weights=probs)[0]
+            self.play_action(available_actions[action_index])
+        return self.path         
+    
+    def get_channel_config(self) -> List[int]:
+        if not self.channels_set:
+            raise ValueError("Channel configuration is not fully set.")
+        dict_chan = {
+            'encoder': self._encoder_channels,
+            'bottleneck': self._bottleneck_channels,
+            'decoder': self._decoder_channels
+        }
+        return dict_chan
+
+    def get_selected_ops(self) -> List[str]:
+        if not self.operations_set:
+            raise ValueError("Operation configuration is not fully set.")
+        dict_ops = {
+            'encoder': self._encoder_ops,
+            'bottleneck': self._bottleneck_op,
+            'decoder': self._decoder_ops
+        }
+        return dict_ops
         
 if __name__ == "__main__":
     import sys
