@@ -1,3 +1,4 @@
+import time
 import seaborn as sns
 import torch
 import torch.nn as nn
@@ -36,3 +37,34 @@ def configure_seaborn(**kwargs):
                "#76455B"]
     
     sns.set_palette(palette)
+
+def simple_benchmark_model(model, input_shape, device, num_iterations=100):
+    model = model.to(device)
+    print(next(model.parameters()).device)
+    model.eval()
+
+    #Warmup
+    with torch.no_grad():
+        for _ in range(10):
+            x = torch.randn(*input_shape).to(device)
+            output = model(x)
+    
+    timings = []
+    with torch.no_grad():
+        for _ in range(num_iterations):
+            x = torch.randn(*input_shape).to(device)
+            
+            if device == "cuda":
+                torch.cuda.synchronize()
+            
+            start = time.time()
+            output = model(x)
+            
+            if device == "cuda":
+                torch.cuda.synchronize()
+            
+            end = time.time()
+            timings.append(end - start)
+    
+    avg_time = sum(timings) / len(timings)
+    return avg_time

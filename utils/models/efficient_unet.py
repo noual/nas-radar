@@ -136,7 +136,7 @@ def benchmark_models():
     """Compare EfficientUNet vs standard UNet"""
     
     # Import the original UNet
-    from unet import UNet
+    from utils.models.unet import UNet
     
     # Create models with similar configurations
     features = [64, 128, 256, 512]

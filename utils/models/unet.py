@@ -23,7 +23,7 @@ class UNet(nn.Module):
         super().__init__()
         self.downs = nn.ModuleList()
         self.ups = nn.ModuleList()
-        self.pool = nn.MaxPool2d(2)
+        self.pool = nn.MaxPool2d(kernel_size=2)
         # Initial convolution to map input to initial_channels
         self.stem = nn.Sequential(
             nn.Conv2d(in_channels, initial_channels, kernel_size=3, padding=1, bias=False),
