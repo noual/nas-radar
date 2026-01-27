@@ -94,7 +94,7 @@ if __name__ == "__main__":
             "in_channels": 3,
             "initial_channels": 8,
             "channel_options": [8, 16, 32, 64, 128, 256],
-            "num_encoder_stages": 4,
+            "num_encoder_stages": 3,
             "n_steps": 5
             },
 
@@ -145,7 +145,7 @@ if __name__ == "__main__":
     t_cpu = simple_benchmark_model(subnet, input_shape=(1, 3, 128, 128), device="cpu")
     print(f"Supernet inference time on CPU over 100 iterations: {t_cpu:.4f}s ({t_cpu/100*1000:.2f}ms per prediction)")
 
-    unet = UNet(in_channels=3, initial_channels=8, features=[32, 64, 128, 256]).to(config.device)
+    unet = UNet(in_channels=3, initial_channels=8, features=[16, 32, 64, 128]).to(config.device)
     t_unet = simple_benchmark_model(unet, input_shape=(1, 3, 128, 128), device=config.device)
     print(f"UNet inference time on GPU over 100 iterations: {t_unet:.4f}s ({t_unet/100*1000:.2f}ms per prediction)")
 

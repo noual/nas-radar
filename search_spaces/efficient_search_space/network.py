@@ -17,7 +17,6 @@ def apply_sliced_operation(module, x, in_channels, out_channels):
     conv_layer = None
     bn_layer = None
     relu_layer = None
-    
     for layer in module:
         if isinstance(layer, nn.Identity):
             if in_channels == out_channels:
@@ -38,9 +37,21 @@ def apply_sliced_operation(module, x, in_channels, out_channels):
     print(f"Sliced weight shape: {sliced_weight.shape}")
     sliced_bias = conv_layer.bias[:out_channels] if conv_layer.bias is not None else None
     
+    current_groups = conv_layer.groups
+    if current_groups > 1:
+        if current_groups == conv_layer.in_channels:
+            # It was a depthwise conv, so groups must track in_channels
+            current_groups = in_channels 
+        else:
+            # It was a grouped conv (e.g. groups=2), keep it if divisible, 
+            # otherwise fallback to 1 or handle specific logic.
+            # For robustness in random search, usually force 1 or assert divisibility.
+            if in_channels % current_groups != 0:
+                current_groups = 1 # Fallback or Raise Error
+
     x = F.conv2d(x, sliced_weight, sliced_bias, 
                  conv_layer.stride, conv_layer.padding, 
-                 conv_layer.dilation, conv_layer.groups)
+                 conv_layer.dilation, groups=current_groups)
     
     # Apply batch normalization with sliced parameters
     if bn_layer is not None:
@@ -65,7 +76,7 @@ class MaximalFrugalRadarNetwork(nn.Module):
     
     def __init__(self, in_channels=3, initial_channels=8, max_channels=512, num_encoder_stages=3, device="cpu"):
         super().__init__()
-        self.out_channels = None
+        self.out_channels = in_channels
         self.encoder = nn.ModuleList()
         self.bottleneck = nn.ModuleDict()
         self.decoder = nn.ModuleList()
@@ -223,6 +234,7 @@ class FrugalRadarNetwork(nn.Module):
                 return False
         # Only final conv remains
         if self.final_conv is None:
+            print(f"Defining final conv with in_channels={self.channel_list['decoder'][-1]}, out_channels={self.out_channels}")
             self.final_conv = nn.Conv2d(self.channel_list["decoder"][-1], 1, kernel_size=1)
             self.to(device=self.device)
         return True
@@ -250,13 +262,8 @@ class FrugalRadarNetwork(nn.Module):
             x = torch.cat((skip_conn, x), dim=1)
             x = module(x)
 
-
-        sliced_weight = self.final_conv.weight[:self.out_channels, :x.size(1), :, :]
-        sliced_bias = self.final_conv.bias[:self.out_channels] if self.final_conv.bias is not None else None
+        x = self.final_conv(x)
         
-        x = F.conv2d(x, sliced_weight, sliced_bias, 
-                    self.final_conv.stride, self.final_conv.padding, 
-                    self.final_conv.dilation, self.final_conv.groups)
         return x
 
 

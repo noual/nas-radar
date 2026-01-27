@@ -79,24 +79,23 @@ class FrugalRadarNode:
         
     def to_str(self) -> str:
         op_map = {
-            'conv_1x1': 'c1x1',
-            'conv_1x3_3x1': 'c1x3',
-            'depthwise_conv_3x3': 'dw3x3',
-            'conv_1x5_5x1': 'c1x5',
-            'dilated_conv_3x3_r2': 'd3r2',
-            'dilated_conv_3x3_r4': 'd3r4',
             'identity': 'id',
-            'none': 'z',
-            'mbconv_3x3': 'mb3x3',
+            'conv_1x1': 'c1x1',
             'conv_3x3': 'c3x3',
-            'depthwise_conv_5x5': 'dw5x5'
+            'sep_conv_3x3': 'sep3x3',       # New: CPU-optimized depthwise separable
+            'double_conv_3x3': 'dbl3x3',    # New: Standard U-Net block
+            'double_conv_3x3_d2': 'dbl3x3d2',    # New: Standard U-Net block
+            'double_conv_3x3_d4': 'dbl3x3d4',    # New: Standard U-Net block
+            'res_double_conv_3x3': 'res2c3', # New: Residual double conv
+            'mbconv_3x3_no_se': 'mb3_ns',   # New: MBConv without Squeeze-and-Excitation
+            'none': 'z'                     # Kept for compatibility if zero-ops are used
         }
         parts = []
         for i in range(self.num_encoder_stages):
-            parts.append(f"e{i}_ch{self._encoder_channels[i]}_{op_map[self._encoder_ops[i]]}")
-        parts.append(f"b_ch{self._bottleneck_channels}_{op_map[self._bottleneck_op]}")
+            parts.append(f"e{i}_ch{self._encoder_channels[i]}_{op_map.get(self._encoder_ops[i], self._encoder_ops[i])}")
+        parts.append(f"b_ch{self._bottleneck_channels}_{op_map.get(self._bottleneck_op, self._bottleneck_op)}")
         for i in range(self.num_decoder_stages):
-            parts.append(f"d{i}_ch{self._decoder_channels[i]}_{op_map[self._decoder_ops[i]]}")
+            parts.append(f"d{i}_ch{self._decoder_channels[i]}_{op_map.get(self._decoder_ops[i], self._decoder_ops[i])}")
         return ":".join(parts)
         
     def play_action(self, name: str, value):
