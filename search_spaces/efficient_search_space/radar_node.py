@@ -127,8 +127,8 @@ class FrugalRadarNode:
                 ch_str, op_str = rest.split('_')
                 ch = int(ch_str)
                 op = op_map_inv.get(op_str, op_str)
-                self.play_action(f'encoder_{index}_channels', ch)
-                self.play_action(f'encoder_{index}_op', op)
+                self.play_action((f'encoder_{index}_channels', ch))
+                self.play_action((f'encoder_{index}_op', op))
             elif part.startswith('b'):
                 _, rest = part.split('_ch')
                 if rest.endswith("mb3_ns"):  # Temporary fix
@@ -136,8 +136,8 @@ class FrugalRadarNode:
                 ch_str, op_str = rest.split('_')
                 ch = int(ch_str)
                 op = op_map_inv.get(op_str, op_str)
-                self.play_action('bottleneck_channels', ch)
-                self.play_action('bottleneck_op', op)
+                self.play_action(('bottleneck_channels', ch))
+                self.play_action(('bottleneck_op', op))
             elif part.startswith('d'):
                 stage, rest = part[1:].split('_ch')
                 index = int(stage)
@@ -146,8 +146,8 @@ class FrugalRadarNode:
                 ch_str, op_str = rest.split('_')
                 ch = int(ch_str)
                 op = op_map_inv.get(op_str, op_str)
-                self.play_action(f'decoder_{index}_channels', ch)
-                self.play_action(f'decoder_{index}_op', op)
+                self.play_action((f'decoder_{index}_channels', ch))
+                self.play_action((f'decoder_{index}_op', op))
             else:
                 raise ValueError(f"Invalid architecture string part: {part}")
         
