@@ -18,7 +18,7 @@ def ConvNormAct(in_ch, out_ch, k=3, s=1, p=1, g=1, d=1):
 
 OPERATIONS = {
     # --- Standard Baselines ---
-    'identity': lambda in_ch, out_ch: nn.Sequential(nn.Identity()) if in_ch == out_ch else nn.Sequential(
+    'identity': lambda in_ch, out_ch: nn.Sequential(
         nn.Conv2d(in_ch, out_ch, kernel_size=1, padding=0, bias=False),
         nn.BatchNorm2d(out_ch)
     ),
@@ -79,15 +79,16 @@ class ResidualDoubleConv(nn.Module):
         self.conv2 = nn.Conv2d(out_ch, out_ch, 3, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(out_ch)
         
-        # Handle skip connection if channels mismatch
-        self.skip = nn.Identity()
-        if in_ch != out_ch:
-            self.skip = nn.Sequential(
-                nn.Conv2d(in_ch, out_ch, 1, bias=False),
-                nn.BatchNorm2d(out_ch)
-            )
+        # FIX: Always instantiate the skip layer.
+        # This ensures 'skip.0.weight' exists in the Supernet.
+        self.skip = nn.Sequential(
+            nn.Conv2d(in_ch, out_ch, 1, bias=False),
+            nn.BatchNorm2d(out_ch)
+        )
 
     def forward(self, x):
+        # We apply the skip projection even if channels match.
+        # The Supernet will learn to make this skip projection an identity mapping.
         identity = self.skip(x)
         
         out = self.conv1(x)

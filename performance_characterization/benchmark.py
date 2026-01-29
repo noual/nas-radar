@@ -181,8 +181,8 @@ if __name__ == "__main__":
     INPUT_SHAPE = (1, 1, 128, 128) # (B, C, H, W)
     
     # 2. Define File Paths
-    ONNX_PATH = "best_nrpa_model_sim.onnx"
-    TRT_PATH = "best_nrpa_model.trt"
+    ONNX_PATH = "pareto_model_sim.onnx"
+    TRT_PATH = "pareto_model.trt"
     
     # 3. Setup Benchmarker
     bm = Benchmarker(input_shape=INPUT_SHAPE, n_warmup=50, n_runs=200)

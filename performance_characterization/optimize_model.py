@@ -4,8 +4,6 @@ import onnxsim
 
 import sys
 sys.path.append("..")
-from search_spaces.radar_node import RadarNode
-from search_spaces.supernet import SuperNet
 
 def optimize_and_export_to_onnx(model, file_path):
 

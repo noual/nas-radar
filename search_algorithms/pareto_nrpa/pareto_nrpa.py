@@ -176,7 +176,7 @@ class ParetoNRPA:
                 t1 = time.time()
 
                 # Logging
-                if level == 1:
+                if level == 2:
                     loggers = {
                         "step": self.advancement,
                         "global_pareto_front": self.global_pareto_front,

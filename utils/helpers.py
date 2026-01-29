@@ -39,7 +39,7 @@ def configure_seaborn(**kwargs):
     sns.set_palette(palette)
 
 def simple_benchmark_model(model, input_shape, device, num_iterations=100):
-    model = model.to(device)
+    model.to(device)
     print(next(model.parameters()).device)
     model.eval()
 
@@ -65,6 +65,9 @@ def simple_benchmark_model(model, input_shape, device, num_iterations=100):
             
             end = time.time()
             timings.append(end - start)
+        # clear cuda cache
+        if device == "cuda":
+            torch.cuda.empty_cache()
     
     avg_time = sum(timings) / len(timings)
     return avg_time
