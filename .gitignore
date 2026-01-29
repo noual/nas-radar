@@ -3,3 +3,6 @@ data/training_set
 outputs
 runs
 *.pyc
+.vscode/
+results/
+wandb/
