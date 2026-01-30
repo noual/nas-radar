@@ -40,7 +40,6 @@ def configure_seaborn(**kwargs):
 
 def simple_benchmark_model(model, input_shape, device, num_iterations=100):
     model.to(device)
-    print(next(model.parameters()).device)
     model.eval()
 
     #Warmup

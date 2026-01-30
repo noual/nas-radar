@@ -9,3 +9,4 @@ supernet:
   num_encoder_stages: 3
   num_nodes: 5
   n_steps: 1
+cpu_ridge_point: 21.96

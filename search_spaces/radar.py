@@ -5,6 +5,7 @@ from omegaconf import OmegaConf
 sys.path.append("..")
 sys.path.append(".")
 sys.path.append("../..")
+from performance_characterization.calculate_ai import ArithmeticIntensityTracker
 from search_spaces.efficient_search_space.supernet import FrugalSuperNet
 
 from data.radar_dataset import RadarDavaDataset
@@ -37,6 +38,7 @@ class Radar:
         self.criterion = DiceLoss()
         self.device = config.device
         self.optimizer = torch.optim.Adam(self.supernet.maximal_net.parameters(), lr=5e-4, betas=(0.9, 0.999), weight_decay=1e-4)
+        self.cpu_ridge_point = config.problem.cpu_ridge_point
 
     def _evaluate(self, node) -> list:
         # Accuracy: run the supernet on k batches 
@@ -72,6 +74,15 @@ class Radar:
                 _ = sample(inputs)
             t1 = time.time()
             latency = (t1 - t0) / 10.0
+
+        # Arithmetic intensity constraint
+        tracker = ArithmeticIntensityTracker(sample, (1, 128, 128)) # Input: 1ch, 64x64
+        tracker.TARGET_RIDGE_POINT = self.cpu_ridge_point
+        ai = tracker.calculate()[0]
+        if ai < self.cpu_ridge_point:
+            penalty = (self.cpu_ridge_point - ai) / self.cpu_ridge_point
+            latency += penalty * 0.1  # Penalty factor
+
         del sample, inputs, targets
         return [avg_loss, latency]
     
