@@ -18,10 +18,10 @@ def ConvNormAct(in_ch, out_ch, k=3, s=1, p=1, g=1, d=1):
 
 OPERATIONS = {
     # --- Standard Baselines ---
-    'identity': lambda in_ch, out_ch: nn.Sequential(
-        nn.Conv2d(in_ch, out_ch, kernel_size=1, padding=0, bias=False),
-        nn.BatchNorm2d(out_ch)
-    ),
+    # 'identity': lambda in_ch, out_ch: nn.Sequential(
+    #     nn.Conv2d(in_ch, out_ch, kernel_size=1, padding=0, bias=False),
+    #     nn.BatchNorm2d(out_ch)
+    # ),
     
     # --- Efficient Single Layers ---
     'conv_1x1': lambda in_ch, out_ch: ConvNormAct(in_ch, out_ch, k=1, p=0),
@@ -44,6 +44,11 @@ OPERATIONS = {
         ConvNormAct(out_ch, out_ch, k=3)
     ),
 
+    # 'double_conv_3x3_s2': lambda in_ch, out_ch: nn.Sequential(
+    #     ConvNormAct(in_ch, out_ch, k=3, s=2, p=1),
+    #     ConvNormAct(out_ch, out_ch, k=3, s=1, p=1)
+    # ),
+
     # --- High Capacity Blocks (U-Net Killers) ---
     # Standard Double Conv (Like U-Net, but with bias=False)
     'double_conv_3x3_d2': lambda in_ch, out_ch: nn.Sequential(
@@ -63,9 +68,13 @@ OPERATIONS = {
 
     # --- MobileNet Variants ---
     # MBConv with SE is slow on CPU. Provide a version WITHOUT SE.
-    'mbconv_3x3_no_se': lambda in_ch, out_ch: MBConvBlock(
+    'mbconv_3x3_no_se_e4': lambda in_ch, out_ch: MBConvBlock(
         in_channels=in_ch, out_channels=out_ch, kernel_size=3, stride=1, 
         expand_ratio=4, se_ratio=0.0 # Disabled SE
+    ),
+    'mbconv_3x3_no_se_e6': lambda in_ch, out_ch: MBConvBlock(
+        in_channels=in_ch, out_channels=out_ch, kernel_size=3, stride=1, 
+        expand_ratio=6, se_ratio=0.0 # Disabled SE
     ),
 }
 

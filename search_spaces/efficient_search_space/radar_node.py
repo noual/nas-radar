@@ -61,27 +61,43 @@ class FrugalRadarNode:
         """Check if all operation choices have been made."""
         return None not in self._encoder_ops + [self._bottleneck_op] + self._decoder_ops
     
-    def get_actions_tuples(self):
-        if not self.channels_set:
+    def get_actions_tuples(self, mode="sequential"):
+        if mode == "channels_first":
+            if not self.channels_set:
+                for i in range(self.num_encoder_stages):
+                    if self._encoder_channels[i] is None:
+                        return [(f'encoder_{i}_channels', ch) for ch in self.channel_options]
+                if self._bottleneck_channels is None:
+                    return [('bottleneck_channels', ch) for ch in self.channel_options]
+                for i in range(self.num_decoder_stages):
+                    if self._decoder_channels[i] is None:
+                        return [(f'decoder_{i}_channels', ch) for ch in self.channel_options]
+            elif not self.operations_set:
+                for i in range(self.num_encoder_stages):
+                    if self._encoder_ops[i] is None:
+                        return [(f'encoder_{i}_op', op) for op in self.OP_LIST]
+                if self._bottleneck_op is None:
+                    return [(f'bottleneck_op', op) for op in self.OP_LIST]
+                for i in range(self.num_decoder_stages):
+                    if self._decoder_ops[i] is None:
+                        return [(f'decoder_{i}_op', op) for op in self.OP_LIST]
+        elif mode == "sequential":
             for i in range(self.num_encoder_stages):
                 if self._encoder_channels[i] is None:
                     return [(f'encoder_{i}_channels', ch) for ch in self.channel_options]
+                if self._encoder_ops[i] is None:
+                    return [(f'encoder_{i}_op', op) for op in self.OP_LIST]
             if self._bottleneck_channels is None:
                 return [('bottleneck_channels', ch) for ch in self.channel_options]
+            if self._bottleneck_op is None:
+                return [('bottleneck_op', op) for op in self.OP_LIST]
             for i in range(self.num_decoder_stages):
                 if self._decoder_channels[i] is None:
                     return [(f'decoder_{i}_channels', ch) for ch in self.channel_options]
-        elif not self.operations_set:
-            for i in range(self.num_encoder_stages):
-                if self._encoder_ops[i] is None:
-                    return [(f'encoder_{i}_op', op) for op in self.OP_LIST]
-            if self._bottleneck_op is None:
-                return [(f'bottleneck_op', op) for op in self.OP_LIST]
-            for i in range(self.num_decoder_stages):
                 if self._decoder_ops[i] is None:
                     return [(f'decoder_{i}_op', op) for op in self.OP_LIST]
         else:
-            raise ValueError("All actions have already been set.")
+            raise ValueError("Unkown mode or all choices have been made.")
         
     def to_str(self) -> str:
         op_map = {
@@ -93,7 +109,8 @@ class FrugalRadarNode:
             'double_conv_3x3_d2': 'dbl3x3d2',    # New: Standard U-Net block
             'double_conv_3x3_d4': 'dbl3x3d4',    # New: Standard U-Net block
             'res_double_conv_3x3': 'res2c3', # New: Residual double conv
-            'mbconv_3x3_no_se': 'mb3ns',   # New: MBConv without Squeeze-and-Excitation
+            'mbconv_3x3_no_se_e4': 'mb3nse4',   # New: MBConv without Squeeze-and-Excitation
+            'mbconv_3x3_no_se_e6': 'mb3nse6',   # New: MBConv without Squeeze-and-Excitation
             'none': 'z'                     # Kept for compatibility if zero-ops are used
         }
         parts = []
@@ -114,7 +131,8 @@ class FrugalRadarNode:
             'dbl3x3d2': 'double_conv_3x3_d2',
             'dbl3x3d4': 'double_conv_3x3_d4',
             'res2c3': 'res_double_conv_3x3',
-            'mb3ns': 'mbconv_3x3_no_se',
+            'mb3nse4': 'mbconv_3x3_no_se_e4',
+            'mb3nse6': 'mbconv_3x3_no_se_e6',
             'z': 'none'
         }
         parts = architecture_str.split(":")
@@ -122,8 +140,6 @@ class FrugalRadarNode:
             if part.startswith('e'):
                 stage, rest = part[1:].split('_ch')
                 index = int(stage)
-                if rest.endswith("mb3_ns"):  # Temporary fix
-                    rest = rest[:-6]+"mb3ns"
                 ch_str, op_str = rest.split('_')
                 ch = int(ch_str)
                 op = op_map_inv.get(op_str, op_str)
@@ -131,8 +147,6 @@ class FrugalRadarNode:
                 self.play_action((f'encoder_{index}_op', op))
             elif part.startswith('b'):
                 _, rest = part.split('_ch')
-                if rest.endswith("mb3_ns"):  # Temporary fix
-                    rest = rest[:-6]+"mb3ns"
                 ch_str, op_str = rest.split('_')
                 ch = int(ch_str)
                 op = op_map_inv.get(op_str, op_str)
@@ -141,8 +155,6 @@ class FrugalRadarNode:
             elif part.startswith('d'):
                 stage, rest = part[1:].split('_ch')
                 index = int(stage)
-                if rest.endswith("mb3_ns"):  # Temporary fix
-                    rest = rest[:-6]+"mb3ns"
                 ch_str, op_str = rest.split('_')
                 ch = int(ch_str)
                 op = op_map_inv.get(op_str, op_str)

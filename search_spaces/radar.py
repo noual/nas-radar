@@ -81,7 +81,7 @@ class Radar:
         ai = tracker.calculate()[0]
         if ai < self.cpu_ridge_point:
             penalty = (self.cpu_ridge_point - ai) / self.cpu_ridge_point
-            latency += penalty * 0.1  # Penalty factor
+            latency += penalty  # Penalty factor
 
         del sample, inputs, targets
         return [avg_loss, latency]
