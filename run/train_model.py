@@ -36,6 +36,23 @@ class DiceLoss(nn.Module):
         intersection = (inputs * targets).sum()
         dice = (2. * intersection + smooth) / (inputs.sum() + targets.sum() + smooth)
         return 1 - dice
+    
+class TverskyLoss(nn.Module):
+    def __init__(self, alpha=0.6):
+        super(TverskyLoss, self).__init__()
+        assert 0 <= alpha <= 1, "Alpha must be in [0, 1]"
+        self.alpha = alpha
+        self.beta = 1-alpha
+
+    def forward(self, inputs, targets, smooth=1):
+        inputs = torch.sigmoid(inputs)
+        inputs = inputs.view(-1)
+        targets = targets.view(-1)
+        TP = (inputs * targets).sum()
+        FP = ((1 - targets) * inputs).sum()
+        FN = (targets * (1 - inputs)).sum()
+        tversky = (TP + smooth) / (TP + self.alpha * FP + self.beta * FN + smooth)
+        return 1 - tversky
 
 def dice_score(inputs, targets, smooth=1e-6):
     """Dice coefficient (1 - DiceLoss)."""
@@ -54,10 +71,21 @@ def iou_score(inputs, targets, smooth=1e-6):
     union = inputs.sum() + targets.sum() - intersection
     return float((intersection + smooth) / (union + smooth))
 
+def false_alarm_rate(inputs, targets):
+    """False Alarm Rate (FAR)."""
+    inputs = torch.sigmoid(inputs)
+    inputs = (inputs > 0.5).float()
+    targets = targets.float()
+    FP = ((1 - targets) * inputs).sum()
+    TN = ((1 - targets) * (1 - inputs)).sum()
+    if (FP + TN) == 0:
+        return 0.0
+    return float(FP / (FP + TN))
+
 
 def evaluate(model, dataloader, criterion, device):
     model.eval()
-    total_loss, total_dice, total_iou = 0, 0, 0
+    total_loss, total_dice, total_iou, total_far = 0, 0, 0, 0
     with torch.no_grad():
         for inputs, targets in dataloader:
             inputs, targets = inputs.to(device), targets.to(device)
@@ -66,8 +94,9 @@ def evaluate(model, dataloader, criterion, device):
             total_loss += loss.item()
             total_dice += dice_score(outputs, targets)
             total_iou += iou_score(outputs, targets)
+            total_far += false_alarm_rate(outputs, targets)
     n = len(dataloader)
-    return total_loss / n, total_dice / n, total_iou / n
+    return total_loss / n, total_dice / n, total_iou / n, total_far / n
 
 
 def train_unet(data_path, cell_str, epochs=200, batch_size=8, learning_rate=1e-5, name="model", in_features=16, problem_config=None, eta_min_factor=0.01):
@@ -91,7 +120,7 @@ def train_unet(data_path, cell_str, epochs=200, batch_size=8, learning_rate=1e-5
         model = supernet.sample(node).to(device)
         _ = model(torch.randn(1, 1, 128, 128).to(device))  # Warmup
 
-    criterion = DiceLoss()
+    criterion = TverskyLoss(alpha=0.7)
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     
     # Cosine learning rate scheduler
@@ -144,7 +173,7 @@ def train_unet(data_path, cell_str, epochs=200, batch_size=8, learning_rate=1e-5
         train_loss /= len(train_loader)
         train_dice /= len(train_loader)
         train_iou /= len(train_loader)
-        val_loss, val_dice, val_iou = evaluate(model, val_loader, criterion, device)
+        val_loss, val_dice, val_iou, val_far = evaluate(model, val_loader, criterion, device)
 
         wandb.log({"train/loss": train_loss,
                    "train/dice": train_dice,
@@ -152,6 +181,7 @@ def train_unet(data_path, cell_str, epochs=200, batch_size=8, learning_rate=1e-5
                    "val/loss": val_loss,
                    "val/dice": val_dice,
                    "val/iou": val_iou,
+                   "val/far": val_far,
                    "lr": optimizer.param_groups[0]["lr"],
                    "epoch": epoch})
 
