@@ -6,11 +6,34 @@ from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt
 
 
-def preprocess_dava_card(card, mini, maxi, target_dim=128, label=False, random_crops=None, flip=False):
+# def preprocess_dava_card(card, mini, maxi, target_dim=128, label=False, random_crops=None, flip=False):
+#     # 1. Normalize card
+#     if not label:
+#         # card = (card + mu) / sigma
+#         card = (card - mini) / (maxi-mini)
+
+#     # 2. Crop card
+#     if random_crops is not None:
+#         card = card[:, random_crops[0]:card.shape[1] - random_crops[1], random_crops[2]:card.shape[2] - random_crops[3]]
+#     if flip:
+#         card = np.flip(card, axis=2)
+
+#     # 3. Zero pad card
+#     x_pad = target_dim - card.shape[1]
+#     y_pad = target_dim - card.shape[2]
+#     x_pad_1 = x_pad // 2
+#     x_pad_2 = x_pad - x_pad_1
+#     y_pad_1 = y_pad // 2
+#     y_pad_2 = y_pad - y_pad_1
+#     card = np.pad(card, ((0, 0), (x_pad_1, x_pad_2), (y_pad_1, y_pad_2)), 'constant')
+#     return card
+
+
+def preprocess_dava_card(card, mu, sigma, min_power, target_dim=128, label=False, random_crops=None, flip=False):
     # 1. Normalize card
     if not label:
-        # card = (card + mu) / sigma
-        card = (card - mini) / (maxi-mini)
+        card = (card - mu) / sigma
+        min_power = (min_power - mu) / sigma
 
     # 2. Crop card
     if random_crops is not None:
@@ -18,16 +41,18 @@ def preprocess_dava_card(card, mini, maxi, target_dim=128, label=False, random_c
     if flip:
         card = np.flip(card, axis=2)
 
-    # 3. Zero pad card
+    # 3. Pad the card using mean power value
     x_pad = target_dim - card.shape[1]
     y_pad = target_dim - card.shape[2]
     x_pad_1 = x_pad // 2
     x_pad_2 = x_pad - x_pad_1
     y_pad_1 = y_pad // 2
     y_pad_2 = y_pad - y_pad_1
-    card = np.pad(card, ((0, 0), (x_pad_1, x_pad_2), (y_pad_1, y_pad_2)), 'constant')
+    if not label:
+        card = np.pad(card, ((0, 0), (x_pad_1, x_pad_2), (y_pad_1, y_pad_2)), 'constant', constant_values=min_power)
+    else:
+        card = np.pad(card, ((0, 0), (x_pad_1, x_pad_2), (y_pad_1, y_pad_2)), 'constant', constant_values=0)
     return card
-
 
 class RadarDataset(Dataset):
 
@@ -66,7 +91,8 @@ class RadarDavaDataset(Dataset):
         if max_idx is not None:
             self.idx = list(range(max_idx))
         self.mini = -79
-        self.maxi = 55
+        self.mu = 1.856
+        self.sigma = 9.07
         self.train_loader = None
         self.val_loader = None
         self.test_loader = None
@@ -84,8 +110,8 @@ class RadarDavaDataset(Dataset):
         np.random.randint(0, 15), np.random.randint(0, 15), np.random.randint(0, 25), np.random.randint(0, 25))
         flip = np.random.choice([True, False])
         n = int(idx / 8000)  # Va changer les stats de normalisation
-        x_dava = preprocess_dava_card(x, self.mini, self.maxi, random_crops=random_crops, flip=flip)
-        y_dava = preprocess_dava_card(y, self.mini, self.maxi, label=True, random_crops=random_crops, flip=flip)
+        x_dava = preprocess_dava_card(x, self.mu, self.sigma, self.mini, random_crops=random_crops, flip=flip)
+        y_dava = preprocess_dava_card(y, self.mu, self.sigma, self.mini, label=True, random_crops=random_crops, flip=flip)
         x = torch.from_numpy(x_dava).float()
         y = torch.from_numpy(y_dava).float()
 
